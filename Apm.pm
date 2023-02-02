@@ -100,6 +100,7 @@ sub start_tx {
         type       => substr( $type, 0, 1024 ),
         timestamp  => int( time * 1000000 ),
         span_count => { started => 0 },
+        context    => { },
     };
 }
 
@@ -139,6 +140,8 @@ sub start_span {
         timestamp => int( time * 1000000 ),
 
     };
+
+    $self->{tx}->{span_count}->{started}++;
 
     unshift( @{ $self->{spans} }, $span );
 
@@ -223,9 +226,13 @@ sub get_stack {
     return @stack;
 }
 
-
 sub send {
     my $self = shift;
+
+    if (!$self->{service_name}) {
+        # not configured
+        return;
+    }
 
     my $url = $self->{url} ? $self->{url} : 'http://127.0.0.1:8200';
 
