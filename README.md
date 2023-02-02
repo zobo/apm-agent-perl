@@ -32,14 +32,31 @@ The agent is configured via constructor object or $ENV. See source for options.
 hook 'before' => sub {
   my $apm = Apm->new({});
   $apm->make_meta;
-  $apm->start_tx(request->path_info, 'request');
+  $apm->start_tx(request->method." ".request->path_info, 'request');
   $apm->parse_trace_header(request->header('ELASTIC-APM-TRACEPARENT') || '');
   $apm->parse_trace_header(request->header('TRACEPARENT') || '');
+  $apm->{tx}->{context}->{request} = {
+    method  => request->method,
+    url     => { full => "http://" . request->{host} . request->{env}->{REQUEST_URI}, },
+    headers => {
+      'user-agent' => request->{user_agent},
+      'x-forwarded-for' => request->headers->{'x-forwarded-for'},
+    },
+  };
   var apm => $apm;
 };
 
 hook 'after' => sub {
+  my $response = shift;
   my $apm = vars->{apm};
+  if ($response->status >= 200 && $response->status < 300) {
+    $apm->{tx}->{outcome} = "success";
+    $apm->{tx}->{result} = "HTTP 2xx";
+  } else {
+    $apm->{tx}->{outcome} = "failure";
+    $apm->{tx}->{result} = "HTTP ".$response->status;
+  }
+  $apm->{tx}->{context}->{response} = { status_code => $response->status };
   $apm->end_tx;
   $apm->send;
 };
@@ -48,6 +65,7 @@ hook 'on_handler_exception' => sub {
   my $exception = shift;
   my $apm = vars->{apm};
   $apm->make_error($exception);
+  $apm->{tx}->{outcome} = "failure";
   $apm->end_tx;
   $apm->send;
 };
