@@ -79,6 +79,55 @@ hook 'after_template_render' => sub {
 };
 ```
 
+## Example for wrapping object calls
+
+This example shows how to "wrap" some class calls without using any (unusual)
+dependencies. `vars` is Perl Dancer specific and can be replaced by some other
+means of getting the current `apm` object.
+The class calls that are wrapped must be imported via `use` in the same perl module.
+
+Code inspired by [Wrap::Sub](https://metacpan.org/pod/Wrap::Sub).
+
+```perl
+use Symbol;
+use WebService::Solr;
+use DBI;
+
+{
+  no warnings 'redefine';
+
+  foreach my $fname (qw(WebService::Solr::generic_solr_request WebService::Solr::search)) {
+    my $glob = qualify_to_ref($fname => scalar caller);
+    my $orig = \&$glob;
+    my $wrap = sub {
+      my @arg = @_;
+      vars->{apm}->start_span($fname." ".$arg[1],"db.solr")->{context}->{db} = { 'statement' => substr(Dumper($arg[2]), 0, 2048), 'type' => 'solr' };
+      my $ret = &$orig(@arg);
+      vars->{apm}->end_span;
+      return $ret;
+    };
+    *$glob = $wrap;
+  }
+}
+
+{
+  no warnings 'redefine';
+
+  foreach my $fname (qw(DBI::db::selectall_arrayref DBI::db::quick_select DBI::db::selectrow_array DBI::db::selectrow_hashref)) {
+    my $glob = qualify_to_ref($fname => scalar caller);
+    my $orig = \&$glob;
+    my $wrap = sub {
+      my @arg = @_;
+      vars->{apm}->start_span($fname,"db.mysq")->{context}->{db} = { 'statement' => substr(Dumper($arg[1]), 0, 2048), 'type' => 'mysql' };
+      my $ret = &$orig(@arg);
+      vars->{apm}->end_span;
+      return $ret;
+    };
+    *$glob = $wrap;
+  }
+}
+```
+
 # License
 
 MIT
