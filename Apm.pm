@@ -15,6 +15,7 @@ use LWP::UserAgent;
 
 sub new {
     my ( $class, $args ) = @_;
+    $args = $args || {};
     my $self = bless {
         service_name => $args->{name}
           || $ENV{ELASTIC_APM_SERVICE_NAME}
@@ -135,8 +136,8 @@ sub start_span {
             : $self->{tx}->{id}
         ),
         trace_id  => $self->{tx}->{trace_id},
-        name      => $name,
-        type      => $type,
+        name      => substr( $name, 0, 1024 ),
+        type      => substr( $type, 0, 1024 ),
         timestamp => int( time * 1000000 ),
         track     => $self->{tx}->{span_count}->{started} < 100,
 
@@ -235,7 +236,8 @@ sub get_stack {
 sub send {
     my $self = shift;
 
-    if (!$self->{service_name}) {
+    if ( !$self->{service_name} ) {
+
         # not configured
         return;
     }
