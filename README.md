@@ -37,7 +37,7 @@ hook 'before' => sub {
   $apm->parse_trace_header(request->header('TRACEPARENT') || '');
   $apm->{tx}->{context}->{request} = {
     method  => request->method,
-    url     => { full => "http://" . request->{host} . request->{env}->{REQUEST_URI}, },
+    url     => { full => substr("http://" . request->{host} . request->{env}->{REQUEST_URI}, 0, 1024), },
     headers => {
       'user-agent' => request->{user_agent},
       'x-forwarded-for' => request->headers->{'x-forwarded-for'},
