@@ -253,7 +253,7 @@ sub send {
     #debug "\n";
     #debug Dumper($req);
 
-    my $lwp = LWP::UserAgent->new;
+    my $lwp = LWP::UserAgent->new( timeout => 3 );
     my $ret = $lwp->request($req);
 
     #debug Dumper($ret);
