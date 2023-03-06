@@ -99,8 +99,8 @@ sub start_tx {
         name       => substr( $name, 0, 1024 ),
         type       => substr( $type, 0, 1024 ),
         timestamp  => int( time * 1000000 ),
-        span_count => { started => 0 },
-        context    => { },
+        span_count => { started => 0, dropped => 0 },
+        context    => {},
     };
 }
 
@@ -138,10 +138,12 @@ sub start_span {
         name      => $name,
         type      => $type,
         timestamp => int( time * 1000000 ),
+        track     => $self->{tx}->{span_count}->{started} < 100,
 
     };
 
     $self->{tx}->{span_count}->{started}++;
+    $self->{tx}->{span_count}->{dropped} += $span->{track} ? 0 : 1;
 
     unshift( @{ $self->{spans} }, $span );
 
@@ -157,10 +159,14 @@ sub end_span {
         $span->{duration} =
           ( int( time * 1000000 ) - $span->{timestamp} ) / 1000;
 
-        my $json = encode_json { span => $span };
+        if ( $span->{track} ) {
+            delete $span->{track};
 
-        $self->{events} .= "\n" . $json;
-        return $json;
+            my $json = encode_json { span => $span };
+
+            $self->{events} .= "\n" . $json;
+            return $json;
+        }
     }
 
     # broken
